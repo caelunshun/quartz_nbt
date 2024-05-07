@@ -33,7 +33,7 @@ impl<'a, W: Write> Serializer<'a, W> {
     /// Constructs a new serializer with the given writer and root name. If no root name is specified,
     /// then an empty string is written to the header.
     pub fn new(writer: &'a mut W, root_name: Option<&'a str>) -> Self {
-        SerializerImpl::new(writer,  root_name.map(BorrowedPrefix::new)).into_serializer()
+        SerializerImpl::new(writer, root_name.map(BorrowedPrefix::new)).into_serializer()
     }
 }
 
@@ -103,6 +103,8 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         if let Some(root_name) = self.root_name {
             root_name.write(self.writer, 0xA)?;
+        } else {
+            raw::write_u8(self.writer, 0x0A)?;
         }
         let prefix = BorrowedPrefix::new(variant);
         SerializeCompoundEntry::new(self.writer, prefix).serialize_seq(Some(len))
@@ -112,6 +114,8 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         if let Some(root_name) = self.root_name {
             root_name.write(self.writer, 0xA)?;
+        } else {
+            raw::write_u8(self.writer, 0x0A)?;
         }
         Ok(SerializeCompound::new(self.writer))
     }
