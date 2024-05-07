@@ -33,7 +33,7 @@ impl<'a, W: Write> Serializer<'a, W> {
     /// Constructs a new serializer with the given writer and root name. If no root name is specified,
     /// then an empty string is written to the header.
     pub fn new(writer: &'a mut W, root_name: Option<&'a str>) -> Self {
-        SerializerImpl::new(writer, BorrowedPrefix::new(root_name.unwrap_or(""))).into_serializer()
+        SerializerImpl::new(writer,  root_name.map(BorrowedPrefix::new)).into_serializer()
     }
 }
 
@@ -41,18 +41,18 @@ impl<'a, W: Write> UncheckedSerializer<'a, W> {
     /// Constructs a new unchecked serializer with the given writer and root name, If no root name is
     /// specified then an empty string is written to the header.
     pub fn new(writer: &'a mut W, root_name: Option<&'a str>) -> Self {
-        SerializerImpl::new(writer, BorrowedPrefix::new(root_name.unwrap_or(""))).into_serializer()
+        SerializerImpl::new(writer, root_name.map(BorrowedPrefix::new)).into_serializer()
     }
 }
 
 pub struct SerializerImpl<'a, W, C> {
     writer: &'a mut W,
-    root_name: BorrowedPrefix<&'a str>,
+    root_name: Option<BorrowedPrefix<&'a str>>,
     _phantom: PhantomData<C>,
 }
 
 impl<'a, W: Write, C: TypeChecker> SerializerImpl<'a, W, C> {
-    fn new(writer: &'a mut W, root_name: BorrowedPrefix<&'a str>) -> Self {
+    fn new(writer: &'a mut W, root_name: Option<BorrowedPrefix<&'a str>>) -> Self {
         SerializerImpl {
             writer,
             root_name,
@@ -101,14 +101,18 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
         variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        self.root_name.write(self.writer, 0xA)?;
+        if let Some(root_name) = self.root_name {
+            root_name.write(self.writer, 0xA)?;
+        }
         let prefix = BorrowedPrefix::new(variant);
         SerializeCompoundEntry::new(self.writer, prefix).serialize_seq(Some(len))
     }
 
     #[inline]
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        self.root_name.write(self.writer, 0xA)?;
+        if let Some(root_name) = self.root_name {
+            root_name.write(self.writer, 0xA)?;
+        }
         Ok(SerializeCompound::new(self.writer))
     }
 
@@ -129,7 +133,9 @@ impl<'a, W: Write, C: TypeChecker> DefaultSerializer for SerializerImpl<'a, W, C
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.root_name.write(self.writer, 0xA)?;
+        if let Some(root_name) = self.root_name {
+            root_name.write(self.writer, 0xA)?;
+        }
         raw::write_u8(self.writer, 0xA)?;
         raw::write_string(self.writer, variant)?;
         // The extra closing tag is added by the SerializeStructVariant impl
